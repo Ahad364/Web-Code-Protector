@@ -694,26 +694,15 @@
             <input type="text" id="domainInput" placeholder="Allowed Domain (Optional, e.g. mysite.com)">
         </div>
 
-        <!-- Feature 4 & 5: Security Level & Anti-Inspect Card -->
-        <div id="securityOptionsCard" style="background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 12px 18px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-shield-halved" style="color: var(--accent-purple);"></i> Security Level
-                </span>
-                <select id="securityLevel" style="background: #1a2333; color: var(--text-main); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 0.8rem; outline: none; cursor: pointer;">
-                    <option value="hardcore">Hardcore (AES-256)</option>
-                    <option value="basic">Basic (Multi-Shift)</option>
-                </select>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px;">
-                <span style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-user-secret" style="color: #ef4444;"></i> Anti-Inspect & Anti-Debug
-                </span>
-                <label class="switch" style="transform: scale(0.85); margin: 0;">
-                    <input type="checkbox" id="antiInspectToggle" checked>
-                    <span class="slider"></span>
-                </label>
-            </div>
+        <!-- Feature 4: Anti-Inspect Card -->
+        <div id="securityOptionsCard" style="background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 18px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-user-secret" style="color: #ef4444;"></i> Anti-Inspect & Anti-Debug
+            </span>
+            <label class="switch" style="transform: scale(0.85); margin: 0;">
+                <input type="checkbox" id="antiInspectToggle" checked>
+                <span class="slider"></span>
+            </label>
         </div>
 
         <!-- Action Main Button -->
@@ -948,7 +937,7 @@
                 copyResult: "परिणाम কপি করুন",
                 downloadHTML: "HTML डाउनलोड করুন",
                 encryptTab: "एन्क्रिप्ट",
-                decryptTab: "डिक्रिप्ट",
+                decryptTab: "ডিক্রিপ্ট",
                 menu: "মেনু",
                 settings: "সেটিংস",
                 darkMode: "ডার্ক মোড",
@@ -1075,7 +1064,7 @@
             return res;
         }
 
-        // Encryption / Decryption Action (Features 2, 4, 5 Applied)
+        // Encryption / Decryption Action (AES-256 + Multi-Shift Both Combined)
         function processAction() {
             const code = document.getElementById('codeArea').value.trim();
 
@@ -1094,36 +1083,29 @@
                     const password = document.getElementById('passInput').value;
                     const domain = document.getElementById('domainInput').value.trim();
                     const antiInspect = document.getElementById('antiInspectToggle').checked;
-                    const secLevel = document.getElementById('securityLevel').value;
 
                     const payloadData = {
                         logic: executableCode,
                         domain: domain || null,
                         antiInspect: antiInspect,
-                        hasPass: !!password,
-                        level: secLevel
+                        hasPass: !!password
                     };
 
-                    let cipherStr = '';
-                    if (secLevel === 'hardcore') {
-                        const key = password ? password : '__CB24_DEFAULT_AES_KEY__';
-                        cipherStr = CryptoJS.AES.encrypt(JSON.stringify(payloadData), key).toString();
-                    } else {
-                        cipherStr = JSON.stringify(payloadData);
-                    }
+                    // লেয়ার ১: AES-256 এনক্রিপশন
+                    const key = password ? password : '__CB24_DEFAULT_AES_KEY__';
+                    const aesCipher = CryptoJS.AES.encrypt(JSON.stringify(payloadData), key).toString();
 
-                    const shifted = encodeCaesar(cipherStr);
+                    // লেয়ার ২: Multi-Shift Caesar সাইফার (দুটো একসাথে প্রয়োগ)
+                    const shifted = encodeCaesar(aesCipher);
                     const base64Data = btoa(encodeURIComponent(shifted).replace(/%([0-9A-F]{2})/g, (match, p1) => {
                         return String.fromCharCode('0x' + p1);
                     }));
 
-                    const isHardcore = secLevel === 'hardcore';
                     const hasPass = !!password;
 
-                    const finalScript = (isHardcore ? `<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"><\/script>\n` : '') +
+                    const finalScript = `<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"><\/script>\n` +
 `<script>(function(){
 var d="${base64Data}";
-var isHardcore=${isHardcore};
 var hasPass=${hasPass};
 var s=decodeURIComponent(atob(d).split('').map(function(c){return'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2);}).join(''));
 s=(function(str){var r='';for(var j=0;j<str.length;j++){var c=str.charCodeAt(j);if(c>=32&&c<=126){c=((c-32-5+95)%95)+32;}r+=String.fromCharCode(c);}return r;})(s);
@@ -1134,21 +1116,16 @@ s=(function(str){var r='';for(var j=0;j<str.length;j++){var c=str.charCodeAt(j);
 s=(function(str){var r='';for(var j=0;j<str.length;j++){var c=str.charCodeAt(j);if(c>=32&&c<=126){c=((c-32-17+95)%95)+32;}r+=String.fromCharCode(c);}return r;})(s);
 s=(function(str){var r='';for(var j=0;j<str.length;j++){var c=str.charCodeAt(j);if(c>=32&&c<=126){c=((c-32-13+95)%95)+32;}r+=String.fromCharCode(c);}return r;})(s);
 try{
-var pData=null;
-if(isHardcore){
-  var passKey='__CB24_DEFAULT_AES_KEY__';
-  if(hasPass){
-    var input=prompt("🔒 This page is encrypted. Enter Password:");
-    if(!input){document.body.innerHTML="<h2 style='text-align:center;color:#ef4444;margin-top:20%;font-family:sans-serif;'>Access Denied: Password Required</h2>";return;}
-    passKey=input;
-  }
-  var decBytes=CryptoJS.AES.decrypt(s,passKey);
-  var rawText=decBytes.toString(CryptoJS.enc.Utf8);
-  if(!rawText){document.body.innerHTML="<h2 style='text-align:center;color:#ef4444;margin-top:20%;font-family:sans-serif;'>Access Denied: Incorrect Password</h2>";return;}
-  pData=JSON.parse(rawText);
-}else{
-  pData=JSON.parse(s);
+var passKey='__CB24_DEFAULT_AES_KEY__';
+if(hasPass){
+  var input=prompt("🔒 This page is encrypted. Enter Password:");
+  if(!input){document.body.innerHTML="<h2 style='text-align:center;color:#ef4444;margin-top:20%;font-family:sans-serif;'>Access Denied: Password Required</h2>";return;}
+  passKey=input;
 }
+var decBytes=CryptoJS.AES.decrypt(s,passKey);
+var rawText=decBytes.toString(CryptoJS.enc.Utf8);
+if(!rawText){document.body.innerHTML="<h2 style='text-align:center;color:#ef4444;margin-top:20%;font-family:sans-serif;'>Access Denied: Incorrect Password</h2>";return;}
+var pData=JSON.parse(rawText);
 
 /* Feature 2: Domain Lock Check */
 if(pData.domain){
@@ -1183,25 +1160,28 @@ eval(pData.logic);
 }catch(err){console.error("Decryption failed:",err);document.body.innerHTML="<h1>Content Cannot Be Displayed</h1><p>Invalid or corrupted content.</p>";}})();<\/script>`;
 
                     document.getElementById('codeArea').value = finalScript;
-                    showToast('Code Encrypted Successfully!');
+                    showToast('Dual-Layer Encrypted Successfully!');
                 } else {
                     const match = code.match(/var d="([^"]+)"/);
                     let rawBase64 = match ? match[1] : code;
 
+                    // লেয়ার ১ রিভার্স: Base64 + Multi-Shift ডিকোড
                     let s = decodeURIComponent(atob(rawBase64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
                     s = decodeCaesar(s);
 
+                    // লেয়ার ২ রিভার্স: AES-256 ডিক্রিপশন
                     let payload = null;
                     const pass = document.getElementById('passInput').value;
+                    const key = pass ? pass : '__CB24_DEFAULT_AES_KEY__';
 
                     try {
-                        payload = JSON.parse(s);
-                    } catch (e) {
-                        const key = pass ? pass : '__CB24_DEFAULT_AES_KEY__';
                         const bytes = CryptoJS.AES.decrypt(s, key);
                         const raw = bytes.toString(CryptoJS.enc.Utf8);
                         if (!raw) throw new Error("Decryption failed");
                         payload = JSON.parse(raw);
+                    } catch (e) {
+                        // ফলব্যাক সাপোর্ট (পুরাতন ফরম্যাটের কোডের জন্য)
+                        payload = JSON.parse(s);
                     }
 
                     let result = payload.logic;
@@ -1210,6 +1190,13 @@ eval(pData.logic);
                         try {
                             result = JSON.parse(htmlMatch[1]);
                         } catch (e) {}
+                    }
+
+                    if (payload.domain) {
+                        document.getElementById('domainInput').value = payload.domain;
+                    }
+                    if (payload.antiInspect !== undefined) {
+                        document.getElementById('antiInspectToggle').checked = payload.antiInspect;
                     }
 
                     document.getElementById('codeArea').value = result;
